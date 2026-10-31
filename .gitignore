@@ -1,0 +1,63 @@
+# Secret configuration (.env.example is the safe template and IS committed)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+backend/.venv/
+
+# Local databases, backups and dumps (they contain personal data and password hashes)
+db.sqlite3*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.bak
+*.dump
+*.sql
+*.sql.gz
+# Configuration exported with dumpdata (PRODUCTION_SETUP.md section 5) may hold contact details
+seed_config.json
+
+# User uploads and collected static files
+media/
+staticfiles/
+
+# Logs
+*.log
+logs/
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# Demo recording tooling, its database, logs and video (local only)
+demo_video/
+
+# Editors, OS and temporary files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+*~
+*.save
+*.tmp
+*.orig

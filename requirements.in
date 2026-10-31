@@ -1,0 +1,14 @@
+# Direct dependencies, pinned. requirements.txt is generated from this file with
+# hashes for every package (see PRODUCTION_SETUP.md section 2):
+#
+#   MYSQLCLIENT_CFLAGS=-I/usr/include MYSQLCLIENT_LDFLAGS=-lmysqlclient \
+#     pip-compile --generate-hashes --strip-extras requirements.in
+#
+# Change versions here, never by hand in requirements.txt.
+Django==5.2.18
+djangorestframework==3.18.2
+django-cors-headers==4.9.0
+python-dotenv==1.2.2
+djangorestframework-simplejwt==5.5.1
+mysqlclient==2.2.7
+django-redis==7.0.0
