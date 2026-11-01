@@ -260,6 +260,10 @@ if len(sys.argv) > 1 and sys.argv[1] == "test":
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", ["http://localhost:5173"])
 # Development only: the Vite dev server opened from a LAN address (a phone on the same Wi-Fi).
 CORS_ALLOWED_ORIGIN_REGEXES = [DEV_ORIGIN_REGEX] if DEBUG else []
+# The frontend calls the API from another origin with cookies included (fetch
+# credentials: "include"), so the device_id cookie reaches sign-up and login.
+# Sign-in itself is the JWT in the Authorization header, never a cookie.
+CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", [])
 
 # Show active service rates (INR per 1,000) on the public landing page.
