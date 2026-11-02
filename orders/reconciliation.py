@@ -116,7 +116,7 @@ def reconcile_admin_wallets():
                                "found": len(own_charges), "amounts": [text(row["amount"]) for row in own_charges],
                                "charge_amount": text(order.charge_amount),
                                "message": "A charged API order does not have exactly one matching charge entry."})
-        due = refund_due(order, order.delivered)
+        due = refund_due(order, order.sandbox_delivered() if order.is_sandbox else order.delivered)
         if (due > 0 and (len(own_refunds) != 1 or own_refunds[0]["amount"] != due)) or (due == 0 and own_refunds):
             mismatches.append({"check": "api_order_refund", "order_id": order.pk, "admin_wallet_id": order.admin_wallet_id,
                                "status": order.fulfillment_status, "expected": text(due), "found": len(own_refunds),

@@ -66,8 +66,11 @@ def _same_order(order, service, quantity, target_link, source):
 
 
 def _ensure_retry_task(order):
-    """A retried request never adds capacity; it only completes a missing Task for a live order."""
-    if order.fulfillment_status == Order.FulfillmentStatus.CANCELLED:
+    """A retried request never adds capacity; it only completes a missing Task for a live order.
+
+    A sandbox order never has a Task.
+    """
+    if order.is_sandbox or order.fulfillment_status == Order.FulfillmentStatus.CANCELLED:
         return
     create_tasks_for_order(order.pk)
 
@@ -139,9 +142,13 @@ def _create_service_order(*, source, service_id, external_order_id, target_link,
         _ensure_retry_task(existing_order)
         return existing_order, False
 
+    # A sandbox wallet's orders are test orders (orders.sandbox): validated and
+    # charged like any other, but never given a Task.
+    sandbox = admin_wallet is not None and admin_wallet.is_sandbox
+
     # A retry above returns its own order; a new order for a link and service
     # that still has an open order is refused (the Service row is locked).
-    refuse_duplicate_active_order(service=service, normalized_link=canonical_link(target_link))
+    refuse_duplicate_active_order(service=service, normalized_link=canonical_link(target_link), sandbox=sandbox)
 
     eligible_user_count = get_eligible_user_count(service)
     capacity_limit = calculate_max_order_quantity(service, eligible_user_count)
@@ -180,6 +187,7 @@ def _create_service_order(*, source, service_id, external_order_id, target_link,
                 fulfillment_status=Order.FulfillmentStatus.ACCEPTED,
                 admin_wallet=wallet,
                 charge_amount=charge,
+                is_sandbox=sandbox,
             )
     except IntegrityError:
         # Without an external ID or request key there is no earlier request to match.
@@ -195,6 +203,9 @@ def _create_service_order(*, source, service_id, external_order_id, target_link,
     # The charge, the order and its Task are one transaction: any failure rolls back all three.
     if wallet is not None:
         debit_order_charge(wallet, order)
+    if sandbox:
+        # No Task (workers never see it) and no new-order alert.
+        return order, True
     create_tasks_for_order(order.pk)
     notify_new_order(order)
     return order, True

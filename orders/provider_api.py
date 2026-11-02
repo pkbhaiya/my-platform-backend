@@ -6,7 +6,8 @@ admin's personal key (compared as a hash in constant time, never logged): orders
 are paid from that admin's wallet, `balance` is that wallet's balance, and
 `status` sees only the orders charged to it. Orders go through
 ``orders.services.create_provider_order``: the same service rules, capacity
-check, row locks and Task creation as every other order.
+check, row locks and Task creation as every other order. A sandbox wallet's
+key places sandbox orders instead (orders.sandbox): charged, but no Task.
 """
 
 import logging
@@ -103,7 +104,8 @@ def order_status(order):
     elif status == "Canceled":
         remains = order.quantity
     else:
-        remains = max(0, order.quantity - order.delivered)
+        delivered = order.sandbox_delivered() if order.is_sandbox else order.delivered
+        remains = max(0, order.quantity - delivered)
     return {"charge": charge(order), "start_count": "0", "status": status, "remains": str(remains), "currency": CURRENCY}
 
 

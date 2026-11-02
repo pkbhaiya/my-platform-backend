@@ -22,6 +22,9 @@ Definitions:
   withdrawals, already deducted from those balances, are shown separately.
 - Adjustment credits: a separate line, never part of rewards.
 
+Sandbox orders (orders.sandbox: test orders with no Task) are left out of
+every figure here; analytics and dashboards read platform_orders().
+
 The Admin Dashboard (bottom of this module) reuses these definitions:
 order value is the total_order_value of non-cancelled, non-rejected cohort
 Orders; revenue, paid to users, payments made (UPI paid out) and profit (our
@@ -132,6 +135,11 @@ def orders_with_delivery():
     )
 
 
+def platform_orders():
+    """orders_with_delivery() without sandbox (test) orders: what analytics and dashboards count."""
+    return orders_with_delivery().filter(is_sandbox=False)
+
+
 def rewards_by_order(order_ids):
     totals = {}
     for order_id, amount in reward_credits().filter(task__order_id__in=order_ids).values_list("task__order_id", "amount"):
@@ -174,7 +182,7 @@ def cohort_profit(closed, rewards):
 
 
 def summary(start, end):
-    cohort = list(orders_with_delivery().filter(in_period("created_at", start, end)))
+    cohort = list(platform_orders().filter(in_period("created_at", start, end)))
     closed = closed_orders(cohort)
     figures = cohort_profit(closed, rewards_by_order([order.pk for order in closed]))
     pending = WithdrawalRequest.objects.filter(status=WithdrawalRequest.Status.PENDING).values_list("amount", flat=True)
@@ -439,7 +447,7 @@ def dashboard_figures(orders, rewards, paid, payments, referral_bonuses=()):
 
 def dashboard_financials(date_from, date_to):
     start, end = period_bounds(date_from, date_to)
-    orders = list(orders_with_delivery().filter(in_period("created_at", start, end)))
+    orders = list(platform_orders().filter(in_period("created_at", start, end)))
     return dashboard_figures(
         orders,
         rewards_by_order([order.pk for order in closed_orders(orders)]),
@@ -457,7 +465,7 @@ def dashboard_trend(date_from, date_to, group_by):
         return bucket_start(timezone.localtime(moment).date(), group_by)
 
     orders, paid, payments = defaultdict(list), defaultdict(list), defaultdict(list)
-    cohort = list(orders_with_delivery().filter(in_period("created_at", start, end)))
+    cohort = list(platform_orders().filter(in_period("created_at", start, end)))
     for order in cohort:
         orders[bucket_of(order.created_at)].append(order)
     for moment, amount in rewards_paid(start, end).values_list("created_at", "amount"):

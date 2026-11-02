@@ -6,6 +6,9 @@ from django.db import models
 
 from services_catalog.models import Service
 
+# A sandbox order with an odd quantity ends Partial with this many units not delivered.
+SANDBOX_PARTIAL_REMAINS = 1
+
 
 class Order(models.Model):
     """Store an incoming or manually created service order."""
@@ -70,6 +73,10 @@ class Order(models.Model):
         blank=True,
         validators=[MinValueValidator(Decimal("0.01"))],
     )
+    # Placed with a sandbox wallet's key (orders.sandbox): charged like any API
+    # order, but it has no Task, workers never see it, analytics and dashboards
+    # leave it out, and it finishes on its own a few minutes after creation.
+    is_sandbox = models.BooleanField(default=False, editable=False)
 
     # Request key used to safely retry administrator-created manual orders.
     idempotency_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
@@ -214,6 +221,15 @@ class Order(models.Model):
             return self.fulfillment_cost_per_1000_snapshot * units / Decimal("1000")
         return None if self.has_fulfillment_cost_snapshot else Decimal("0")
 
+    def sandbox_delivered(self):
+        """What a sandbox order (no Task, no claims) counts as delivered: every
+        unit once Completed, all but SANDBOX_PARTIAL_REMAINS once Partial, none before."""
+        if self.fulfillment_status == self.FulfillmentStatus.COMPLETED:
+            return self.quantity
+        if self.fulfillment_status == self.FulfillmentStatus.PARTIAL:
+            return max(0, self.quantity - SANDBOX_PARTIAL_REMAINS)
+        return 0
+
 
 class AdminWallet(models.Model):
     """One per staff user: the prepaid INR balance that pays for the API orders placed with their personal key.
@@ -247,6 +263,9 @@ class AdminWallet(models.Model):
     # last announcement went out (at most one every 15 minutes).
     refused_orders_unreported = models.PositiveIntegerField(default=0, editable=False)
     refused_alert_at = models.DateTimeField(null=True, blank=True, editable=False)
+    # A test wallet for an outside panel's support team: orders placed with its
+    # key are sandbox orders (Order.is_sandbox). Set by create_sandbox_account.
+    is_sandbox = models.BooleanField(default=False, editable=False)
 
     class Meta:
         ordering = ["admin_id"]

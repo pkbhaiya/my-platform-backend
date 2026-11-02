@@ -163,7 +163,7 @@ def flush_order_summaries(now=None):
         if not OrderAlertWindow.objects.filter(pk=window.pk, summary_sent_at__isnull=True).update(summary_sent_at=now):
             continue
         end = window.window_start + ORDER_WINDOW
-        orders = Order.objects.filter(created_at__gte=window.window_start, created_at__lt=end)
+        orders = Order.objects.filter(created_at__gte=window.window_start, created_at__lt=end, is_sandbox=False)
         ids = list(orders.order_by("pk").values_list("pk", "total_order_value"))
         value = sum((amount for _pk, amount in ids), Decimal("0"))
         local = timezone.localtime(window.window_start)

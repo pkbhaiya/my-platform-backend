@@ -4,6 +4,7 @@ from .views import IncomingOrderAPIView, IncomingServicesAPIView
 from .admin_wallet_views import (
     AdminWalletAdjustmentAPIView,
     AdminWalletDetailAPIView,
+    AdminWalletRevokeSandboxKeyAPIView,
     AdminWalletsAPIView,
     AdminWalletTransactionsAPIView,
     MyWalletAddFundsAPIView,
@@ -27,6 +28,8 @@ urlpatterns = [
     path("admin/admin-wallets/<int:wallet_id>/", AdminWalletDetailAPIView.as_view(), name="admin-wallet"),
     path("admin/admin-wallets/<int:wallet_id>/transactions/", AdminWalletTransactionsAPIView.as_view(), name="admin-wallet-transactions"),
     path("admin/admin-wallets/<int:wallet_id>/adjustments/", AdminWalletAdjustmentAPIView.as_view(), name="admin-wallet-adjustment"),
+    path("admin/admin-wallets/<int:wallet_id>/revoke-sandbox-key/", AdminWalletRevokeSandboxKeyAPIView.as_view(),
+         name="admin-wallet-revoke-sandbox-key"),
     path("admin/orders/bulk-delete/", AdminBulkDeleteOrdersAPIView.as_view(), name="admin-orders-bulk-delete"),
     path(
         "orders/incoming/",

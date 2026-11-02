@@ -3,8 +3,9 @@
 My Wallet (every admin, their own wallet only): balance, this month's figures,
 add funds, regenerate the API key, ledger. Admin Wallets (superusers only):
 every admin's wallet and ledger, read-only except adjustments, which need a
-note and are audit-logged. A new key is in its one response only (no-store);
-afterwards only its first 8 characters (api_key_prefix) are ever shown.
+note and are audit-logged, and revoking a sandbox wallet's key. A new key is
+in its one response only (no-store); afterwards only its first 8 characters
+(api_key_prefix) are ever shown.
 """
 
 from decimal import Decimal
@@ -26,7 +27,9 @@ from common.analytics import period_bounds
 from tasks.services import _retry_when_locked
 
 from .admin_api_views import no_store
-from .admin_wallets import ensure_admin_wallet, record_add_funds, record_adjustment, regenerate_api_key, update_low_balance_threshold
+from .admin_wallets import (
+    ensure_admin_wallet, record_add_funds, record_adjustment, regenerate_api_key, revoke_sandbox_key, update_low_balance_threshold,
+)
 from .models import AdminWallet, AdminWalletTransaction
 
 Type = AdminWalletTransaction.Type
@@ -83,6 +86,8 @@ def wallet_row(wallet, figures=None):
         "id": wallet.pk,
         "admin": {"id": admin.pk, "email": admin.email, "full_name": admin.full_name, "is_superuser": admin.is_superuser,
                   "is_staff": admin.is_staff, "is_active": admin.is_active},
+        # A test wallet (orders.sandbox): its orders have no Task and are left out of analytics.
+        "is_sandbox": wallet.is_sandbox,
         "balance": money(wallet.balance),
         "low_balance_threshold": money(wallet.low_balance_threshold),
         "low_balance": wallet.balance < wallet.low_balance_threshold,
@@ -277,3 +282,17 @@ class AdminWalletAdjustmentAPIView(APIView):
         row = AdminWalletTransaction.objects.select_related("created_by").get(pk=row.pk)
         return Response({"transaction": transaction_row(row), "wallet": wallet_row(loaded(wallet_id)), "created": created},
                         status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class AdminWalletRevokeSandboxKeyAPIView(APIView):
+    """POST: remove a sandbox wallet's key; it is refused from then on. Sandbox wallets only."""
+
+    permission_classes = [IsSuperUser]
+
+    def post(self, request, wallet_id):
+        get_object_or_404(AdminWallet, pk=wallet_id)
+        try:
+            _retry_when_locked(revoke_sandbox_key, wallet_id=wallet_id)
+        except DjangoValidationError as exc:
+            raise refused(exc)
+        return no_store(Response(wallet_row(loaded(wallet_id))))

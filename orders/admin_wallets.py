@@ -219,7 +219,7 @@ def refund_api_order(order_id):
     existing = AdminWalletTransaction.objects.filter(refund_order=order).first()
     if existing:
         return existing
-    delivered = delivered_units(order.pk)
+    delivered = order.sandbox_delivered() if order.is_sandbox else delivered_units(order.pk)
     amount = refund_due(order, delivered)
     if amount <= 0:
         return None
@@ -335,6 +335,17 @@ def regenerate_api_key(*, wallet_id):
     AdminWallet.objects.filter(pk=wallet.pk).update(api_key_prefix=prefix, api_key_hash=digest, api_key_created_at=now)
     wallet.api_key_prefix, wallet.api_key_hash, wallet.api_key_created_at = prefix, digest, now
     return wallet, key
+
+
+@transaction.atomic
+def revoke_sandbox_key(*, wallet_id):
+    """Remove a sandbox wallet's key: it is refused from now on. Only sandbox wallets; idempotent."""
+    wallet = _locked(wallet_id)
+    if not wallet.is_sandbox:
+        raise ValidationError("Only a sandbox wallet's key can be revoked here.")
+    AdminWallet.objects.filter(pk=wallet.pk).update(api_key_hash=None, api_key_prefix="", api_key_created_at=None)
+    wallet.api_key_hash, wallet.api_key_prefix, wallet.api_key_created_at = None, "", None
+    return wallet
 
 
 @transaction.atomic

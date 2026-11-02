@@ -149,7 +149,7 @@ All routes below are taken from the URL configuration.
 | Orders | `/api/v1/admin/orders/` (GET), `/api/v1/admin/orders/create/` (POST), `/api/v1/admin/orders/<id>/previous-orders/` (GET), `/api/v1/admin/orders/bulk-delete/` (POST) |
 | Tasks and reviews | `/api/v1/admin/tasks/pending/`, `/api/v1/admin/tasks/history/`, `/api/v1/admin/tasks/review-history/`, `/api/v1/admin/tasks/<id>/submissions/` (GET); `/api/v1/admin/tasks/<id>/review/`, `.../resume/`, `.../cancel/`, `/api/v1/admin/task-submissions/<claim_id>/review/`, `/api/v1/admin/tasks/bulk-delete/` (POST) |
 | Wallets and withdrawals | `/api/v1/admin/wallet/transactions/`, `/api/v1/admin/wallet/withdrawals/` (GET), `/api/v1/admin/wallet/withdrawals/<id>/review/` (POST), `/api/v1/admin/wallet/reconciliation/` (GET), `/api/v1/admin/wallet/reconciliation/<run_id>/review/` (POST) |
-| Admin wallets (reseller funds) | `/api/v1/admin/my-wallet/` (GET, PATCH), `.../add-funds/`, `.../regenerate-key/` (POST), `.../transactions/` (GET); `/api/v1/admin/admin-wallets/` (GET), `/api/v1/admin/admin-wallets/<id>/` (GET), `.../transactions/` (GET), `.../adjustments/` (POST) |
+| Admin wallets (reseller funds) | `/api/v1/admin/my-wallet/` (GET, PATCH), `.../add-funds/`, `.../regenerate-key/` (POST), `.../transactions/` (GET); `/api/v1/admin/admin-wallets/` (GET), `/api/v1/admin/admin-wallets/<id>/` (GET), `.../transactions/` (GET), `.../adjustments/`, `.../revoke-sandbox-key/` (POST) |
 | Referrals | `/api/v1/admin/referrals/`, `/api/v1/admin/referrals/top/` (GET), `/api/v1/admin/referrals/<id>/approve/`, `.../reject/` (POST) |
 | Settings and maintenance | `/api/v1/admin/platform-settings/` (GET, PATCH), `.../changes/` (GET), `.../test-alert/` (POST), `/api/v1/admin/maintenance/` (GET) |
 | Analytics and dashboard | `/api/v1/admin/analytics/`, `.../orders/`, `.../orders/<id>/`, `.../users/`, `.../payouts/`, `/api/v1/admin/dashboard/stats/` (GET) |
@@ -162,11 +162,22 @@ All routes below are taken from the URL configuration.
 | POST | `/api/v1/orders/incoming/` |
 | GET | `/api/v1/services/incoming/` |
 
+**Sandbox key.** `manage.py create_sandbox_account` creates (or updates) the
+staff account `perfectpanel-test`: an unusable password, so it can never sign
+in, and a sandbox admin wallet funded once with ₹100.00. It prints a new key
+once (when the wallet has none, or with `--new-key`). Orders placed with that
+key are checked and charged like any API order, but get no Task, are never
+shown to workers and are left out of analytics and dashboards. They move on
+by themselves (`orders/sandbox.py`): In progress 1 minute after creation, and
+after 3 minutes Completed, or Partial with 1 unit refunded when the quantity is
+odd. A superuser can revoke the key on the Admin wallets page.
+
 ## Scheduled jobs
 
 | Command | When |
 |---|---|
-| `manage.py expire_claims` | every minute (expires stale claims and old orders) |
+| `manage.py expire_claims` | every minute (expires stale claims and old orders; moves sandbox orders on) |
+| `manage.py advance_sandbox_orders` | every minute, only where `expire_claims` is not scheduled (moves sandbox orders on) |
 | `manage.py process_referrals` | daily |
 | `manage.py reconcile_wallets` | daily (reports mismatches; never changes balances) |
 | `manage.py purge_account_signals` | daily (data retention) |

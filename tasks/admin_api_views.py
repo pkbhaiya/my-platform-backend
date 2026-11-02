@@ -209,7 +209,8 @@ class AdminDashboardStatsAPIView(APIView):
         group_by = analytics.dashboard_group_by(request.query_params)
         today_start, tomorrow_start = analytics.period_bounds(timezone.localdate(), timezone.localdate())
 
-        revenue_orders = Order.objects.exclude(fulfillment_status__in=NON_REVENUE_ORDER_STATUSES)
+        # Sandbox (test) orders never count, like everywhere in common.analytics.
+        revenue_orders = Order.objects.filter(is_sandbox=False).exclude(fulfillment_status__in=NON_REVENUE_ORDER_STATUSES)
         order_totals = revenue_orders.aggregate(
             total=Count("id"),
             today=Count("id", filter=Q(created_at__gte=today_start, created_at__lt=tomorrow_start)),
@@ -364,6 +365,8 @@ class AdminOrdersAPIView(APIView):
                 "service_id": order.service_id,
                 "service_name": order.service.name,
                 "source": order.source,
+                # A test order from a sandbox wallet (no Task; finishes on its own).
+                "is_sandbox": order.is_sandbox,
                 "external_order_id": order.external_order_id,
                 "idempotency_key": str(order.idempotency_key) if order.idempotency_key else None,
                 "target_link": order.target_link,
@@ -376,7 +379,7 @@ class AdminOrdersAPIView(APIView):
                 "total_slots": task.total_slots if task else None,
                 "remaining_slots": task.remaining_slots if task else None,
                 "task_status": task.status if task else None,
-                **delivery(order.quantity, order.delivered),
+                **delivery(order.quantity, order.sandbox_delivered() if order.is_sandbox else order.delivered),
                 "cancellation": cancellation(task) if task else None,
                 "created_at": order.created_at.isoformat(),
                 "updated_at": order.updated_at.isoformat(),

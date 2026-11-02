@@ -16,11 +16,13 @@ class OrderAdmin(admin.ModelAdmin):
         "charge_amount",
         "availability_status",
         "fulfillment_status",
+        "is_sandbox",
         "created_at",
     )
 
     list_filter = (
         "source",
+        "is_sandbox",
         "availability_status",
         "fulfillment_status",
         "created_at",
@@ -80,7 +82,7 @@ class ReadOnlyAdmin(admin.ModelAdmin):
 
 @admin.register(AdminWallet)
 class AdminWalletAdmin(ReadOnlyAdmin):
-    list_display = ("id", "admin", "api_key_prefix", "balance", "low_balance_threshold", "api_key_last_used_at", "created_at")
+    list_display = ("id", "admin", "is_sandbox", "api_key_prefix", "balance", "low_balance_threshold", "api_key_last_used_at", "created_at")
     search_fields = ("admin__email", "api_key_prefix")
     exclude = ("api_key_hash",)
 

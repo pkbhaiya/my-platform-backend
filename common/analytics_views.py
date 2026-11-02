@@ -44,7 +44,7 @@ class AdminAnalyticsOrdersAPIView(AnalyticsView):
 
     def get(self, request):
         period, start, end = self.period(request)
-        orders = analytics.orders_with_delivery().filter(analytics.in_period("created_at", start, end)).order_by("-created_at", "-id")
+        orders = analytics.platform_orders().filter(analytics.in_period("created_at", start, end)).order_by("-created_at", "-id")
         admin_wallet = request.query_params.get("admin_wallet", "")
         if admin_wallet == "manual":
             orders = orders.filter(admin_wallet__isnull=True)
@@ -59,7 +59,7 @@ class AdminAnalyticsOrdersAPIView(AnalyticsView):
 
 class AdminAnalyticsOrderDetailAPIView(AnalyticsView):
     def get(self, request, order_id):
-        order = get_object_or_404(analytics.orders_with_delivery(), pk=order_id)
+        order = get_object_or_404(analytics.platform_orders(), pk=order_id)
         return Response({"order": analytics.order_rows([order])[0], "approved_claims": analytics.order_approvals(order)})
 
 

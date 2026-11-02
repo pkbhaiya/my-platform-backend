@@ -34,13 +34,15 @@ def duplicate_blocking_enabled():
     return SiteConfiguration._meta.get_field("block_duplicate_active_orders").default if value is None else value
 
 
-def refuse_duplicate_active_order(*, service, normalized_link):
+def refuse_duplicate_active_order(*, service, normalized_link, sandbox=False):
     """Rule 1. Call with the Service row locked (select_for_update): every order
     for that service waits on the same lock, so two orders for one (link,
-    service) can never both pass this check."""
+    service) can never both pass this check. Sandbox orders are only compared
+    with sandbox orders, and real orders only with real ones."""
     if not normalized_link or not duplicate_blocking_enabled():
         return
-    if Order.objects.filter(service=service, normalized_link=normalized_link, fulfillment_status__in=ACTIVE_ORDER_STATUSES).exists():
+    if Order.objects.filter(service=service, normalized_link=normalized_link, fulfillment_status__in=ACTIVE_ORDER_STATUSES,
+                            is_sandbox=sandbox).exists():
         raise DuplicateActiveOrder()
 
 
