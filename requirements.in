@@ -12,3 +12,5 @@ python-dotenv==1.2.2
 djangorestframework-simplejwt==5.5.1
 mysqlclient==2.2.7
 django-redis==7.0.0
+# Fernet: the encrypted copy of each admin API key (orders/api_keys.py).
+cryptography==50.0.2

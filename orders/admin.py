@@ -84,7 +84,7 @@ class ReadOnlyAdmin(admin.ModelAdmin):
 class AdminWalletAdmin(ReadOnlyAdmin):
     list_display = ("id", "admin", "is_sandbox", "api_key_prefix", "balance", "low_balance_threshold", "api_key_last_used_at", "created_at")
     search_fields = ("admin__email", "api_key_prefix")
-    exclude = ("api_key_hash",)
+    exclude = ("api_key_hash", "api_key_encrypted")
 
 
 @admin.register(AdminWalletTransaction)

@@ -1,11 +1,11 @@
 """Admin API for admin wallets.
 
 My Wallet (every admin, their own wallet only): balance, this month's figures,
-add funds, regenerate the API key, ledger. Admin Wallets (superusers only):
-every admin's wallet and ledger, read-only except adjustments, which need a
-note and are audit-logged, and revoking a sandbox wallet's key. A new key is
-in its one response only (no-store); afterwards only its first 8 characters
-(api_key_prefix) are ever shown.
+add funds, the full API key, regenerate it, ledger. Admin Wallets (superusers
+only): every admin's wallet and ledger, read-only except adjustments, which
+need a note and are audit-logged, and revoking a sandbox wallet's key. The
+full key is only in the api-key responses (to the owner or a superuser) and
+the regenerate response, all no-store; never in wallet rows or lists.
 """
 
 from decimal import Decimal
@@ -17,7 +17,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import serializers, status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import BasePermission, IsAdminUser
 from rest_framework.response import Response
@@ -27,6 +27,7 @@ from common.analytics import period_bounds
 from tasks.services import _retry_when_locked
 
 from .admin_api_views import no_store
+from .api_keys import stored_api_key
 from .admin_wallets import (
     ensure_admin_wallet, record_add_funds, record_adjustment, regenerate_api_key, revoke_sandbox_key, update_low_balance_threshold,
 )
@@ -34,6 +35,9 @@ from .models import AdminWallet, AdminWalletTransaction
 
 Type = AdminWalletTransaction.Type
 ZERO = Decimal("0.00")
+
+
+KEY_NOT_STORED = "Regenerate to display the full key"
 
 
 class IsSuperUser(BasePermission):
@@ -96,6 +100,23 @@ def wallet_row(wallet, figures=None):
         "this_month": {name: money(value) for name, value in month.items()},
         "created_at": when(wallet.created_at),
     }
+
+
+def api_key_payload(wallet):
+    """The wallet's full key for its owner or a superuser; key null (with why) when it cannot be shown."""
+    key = stored_api_key(wallet)
+    payload = {
+        "wallet_id": wallet.pk,
+        "configured": bool(wallet.api_key_hash),
+        "key": key,
+        "created_at": when(wallet.api_key_created_at),
+        "last_used_at": when(wallet.api_key_last_used_at),
+    }
+    if wallet.api_key_hash and key is None:
+        # Made before keys were stored encrypted (only its hash exists): the
+        # owner has to regenerate it. Nothing is regenerated automatically.
+        payload["message"] = KEY_NOT_STORED
+    return no_store(Response(payload))
 
 
 def transaction_row(row):
@@ -213,7 +234,7 @@ class MyWalletAddFundsAPIView(APIView):
 
 
 class MyWalletRegenerateKeyAPIView(APIView):
-    """POST: a new personal key, in this response only. The old key stops working immediately."""
+    """POST: a new personal key (also readable later from my-wallet/api-key/). The old key stops working immediately."""
 
     permission_classes = [IsAdminUser]
 
@@ -224,6 +245,15 @@ class MyWalletRegenerateKeyAPIView(APIView):
         except DjangoValidationError as exc:
             raise refused(exc)
         return no_store(Response({"wallet": wallet_row(loaded(wallet.pk)), "api_key": key}, status=status.HTTP_201_CREATED))
+
+
+class MyWalletApiKeyAPIView(APIView):
+    """GET the signed-in admin's own full API key (no-store)."""
+
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        return api_key_payload(loaded(ensure_admin_wallet(request.user).pk))
 
 
 class MyWalletTransactionsAPIView(APIView):
@@ -255,6 +285,18 @@ class AdminWalletDetailAPIView(APIView):
 
     def get(self, request, wallet_id):
         return Response(wallet_row(get_object_or_404(AdminWallet.objects.select_related("admin"), pk=wallet_id)))
+
+
+class AdminWalletApiKeyAPIView(APIView):
+    """GET one wallet's full API key: only its owner or a superuser (no-store)."""
+
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, wallet_id):
+        wallet = get_object_or_404(AdminWallet.objects.select_related("admin"), pk=wallet_id)
+        if not (request.user.is_superuser or wallet.admin_id == request.user.pk):
+            raise PermissionDenied("Only the wallet's owner or a superuser can see its API key.")
+        return api_key_payload(wallet)
 
 
 class AdminWalletTransactionsAPIView(APIView):

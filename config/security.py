@@ -1,16 +1,22 @@
-"""DEBUG, SECRET_KEY and the JWT signing key from environment variables, failing closed.
+"""DEBUG, SECRET_KEY, the JWT signing key and the API key encryption key from environment variables, failing closed.
 
 DEBUG is on only when DJANGO_DEBUG is "true": a missing or misspelled variable
-gives production settings. Production must then provide DJANGO_SECRET_KEY and
-DJANGO_JWT_SIGNING_KEY. Development keeps a random secret key in the local .env,
-written there the first time Django starts without one.
+gives production settings. Production must then provide DJANGO_SECRET_KEY,
+DJANGO_JWT_SIGNING_KEY and API_KEY_ENCRYPTION_KEY. Development keeps a random
+secret key in the local .env, written there the first time Django starts
+without one.
 """
 
+import base64
+import hashlib
 import ipaddress
 import os
 import secrets
 
+from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
+
+GENERATE_FERNET_KEY = 'python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
 
 
 def debug_from_env(environ):
@@ -48,6 +54,30 @@ def jwt_signing_key_from_env(environ, *, debug, secret_key):
     if debug:
         return secret_key
     raise ImproperlyConfigured("Set DJANGO_JWT_SIGNING_KEY (50+ random characters, not the secret key); it is required unless DJANGO_DEBUG=true.")
+
+
+def api_key_encryption_key_from_env(environ, *, debug, secret_key):
+    """The Fernet key that encrypts the stored copy of each admin API key (orders.api_keys).
+
+    Required in production. Development derives one from SECRET_KEY, so a local
+    .env needs nothing extra. Changing it makes stored keys unreadable (they
+    show as "Regenerate to display the full key"); it never affects which keys
+    are accepted, which is decided by their hash.
+    """
+    key = environ.get("API_KEY_ENCRYPTION_KEY", "").strip()
+    if not key:
+        if debug:
+            return base64.urlsafe_b64encode(hashlib.sha256(f"api-key-encryption:{secret_key}".encode()).digest()).decode()
+        raise ImproperlyConfigured(
+            f"Set API_KEY_ENCRYPTION_KEY (generate one with: {GENERATE_FERNET_KEY}); it is required unless DJANGO_DEBUG=true."
+        )
+    try:
+        Fernet(key)
+    except ValueError:
+        raise ImproperlyConfigured(
+            f"API_KEY_ENCRYPTION_KEY is not a valid Fernet key (32 url-safe base64-encoded bytes); generate one with: {GENERATE_FERNET_KEY}"
+        ) from None
+    return key
 
 
 def is_local_host(host):

@@ -74,7 +74,8 @@ settings and refuses to run without production secrets. In development a random
 
 Every variable is described in `.env.example`. Production needs at least
 `DJANGO_SECRET_KEY`, `DJANGO_JWT_SIGNING_KEY`, `ACCOUNT_SIGNAL_SALT`,
-`DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS` and the database settings
+`API_KEY_ENCRYPTION_KEY` (a Fernet key; it encrypts the stored copy of each
+admin API key), `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS` and the database settings
 (see `PRODUCTION_SETUP.md`, section 3).
 
 ### 3. Database
@@ -149,7 +150,7 @@ All routes below are taken from the URL configuration.
 | Orders | `/api/v1/admin/orders/` (GET), `/api/v1/admin/orders/create/` (POST), `/api/v1/admin/orders/<id>/previous-orders/` (GET), `/api/v1/admin/orders/bulk-delete/` (POST) |
 | Tasks and reviews | `/api/v1/admin/tasks/pending/`, `/api/v1/admin/tasks/history/`, `/api/v1/admin/tasks/review-history/`, `/api/v1/admin/tasks/<id>/submissions/` (GET); `/api/v1/admin/tasks/<id>/review/`, `.../resume/`, `.../cancel/`, `/api/v1/admin/task-submissions/<claim_id>/review/`, `/api/v1/admin/tasks/bulk-delete/` (POST) |
 | Wallets and withdrawals | `/api/v1/admin/wallet/transactions/`, `/api/v1/admin/wallet/withdrawals/` (GET), `/api/v1/admin/wallet/withdrawals/<id>/review/` (POST), `/api/v1/admin/wallet/reconciliation/` (GET), `/api/v1/admin/wallet/reconciliation/<run_id>/review/` (POST) |
-| Admin wallets (reseller funds) | `/api/v1/admin/my-wallet/` (GET, PATCH), `.../add-funds/`, `.../regenerate-key/` (POST), `.../transactions/` (GET); `/api/v1/admin/admin-wallets/` (GET), `/api/v1/admin/admin-wallets/<id>/` (GET), `.../transactions/` (GET), `.../adjustments/`, `.../revoke-sandbox-key/` (POST) |
+| Admin wallets (reseller funds) | `/api/v1/admin/my-wallet/` (GET, PATCH), `.../api-key/` (GET, the full key), `.../add-funds/`, `.../regenerate-key/` (POST), `.../transactions/` (GET); `/api/v1/admin/admin-wallets/` (GET), `/api/v1/admin/admin-wallets/<id>/` (GET), `.../api-key/` (GET, owner or superuser only), `.../transactions/` (GET), `.../adjustments/`, `.../revoke-sandbox-key/` (POST) |
 | Referrals | `/api/v1/admin/referrals/`, `/api/v1/admin/referrals/top/` (GET), `/api/v1/admin/referrals/<id>/approve/`, `.../reject/` (POST) |
 | Settings and maintenance | `/api/v1/admin/platform-settings/` (GET, PATCH), `.../changes/` (GET), `.../test-alert/` (POST), `/api/v1/admin/maintenance/` (GET) |
 | Analytics and dashboard | `/api/v1/admin/analytics/`, `.../orders/`, `.../orders/<id>/`, `.../users/`, `.../payouts/`, `/api/v1/admin/dashboard/stats/` (GET) |

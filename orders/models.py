@@ -234,7 +234,8 @@ class Order(models.Model):
 class AdminWallet(models.Model):
     """One per staff user: the prepaid INR balance that pays for the API orders placed with their personal key.
 
-    The key is stored only as a SHA-256 hash (orders.api_keys). Orders placed
+    The key is looked up by its SHA-256 hash; an encrypted copy lets its owner
+    and superusers see it in full (orders.api_keys). Orders placed
     with it (/api/v2 and the X-API-Key endpoints) are charged to `balance` at
     creation; the balance only changes together with an AdminWalletTransaction
     row (orders.admin_wallets). Worker wallets (wallet.Wallet) are separate.
@@ -246,6 +247,10 @@ class AdminWallet(models.Model):
     balance = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     # NULL until the admin generates a key on My Wallet; unique, and NULLs never collide.
     api_key_hash = models.CharField(max_length=64, unique=True, null=True, blank=True, editable=False)
+    # The same key, Fernet-encrypted with settings.API_KEY_ENCRYPTION_KEY, so the
+    # owner and superusers can see it in full (orders.api_keys). Never used to
+    # accept a key: that is the hash. Empty for keys made before it existed.
+    api_key_encrypted = models.CharField(max_length=255, blank=True, default="", editable=False)
     # First 8 characters of the key, so admins can tell keys apart. A key carried
     # over from the single Phase 6 key shows "…" and that key's last 4 instead.
     api_key_prefix = models.CharField(max_length=8, blank=True, default="")

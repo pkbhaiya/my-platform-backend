@@ -325,15 +325,18 @@ def record_adjustment(*, wallet_id, amount, note, by, request_key=None):
 def regenerate_api_key(*, wallet_id):
     """Replace the wallet's key (or create its first one); the old key stops working at once.
 
-    Returns (wallet, new key); the key is never stored or shown again.
+    Returns (wallet, new key). The key is stored as its hash (for lookups) and
+    an encrypted copy (for display to its owner and superusers), never in plain text.
     """
     wallet = _locked(wallet_id)
     if not wallet.admin.is_staff:
         raise ValidationError(NOT_STAFF)
-    key, prefix, digest = new_api_key()
+    key, prefix, digest, encrypted = new_api_key()
     now = timezone.now()
-    AdminWallet.objects.filter(pk=wallet.pk).update(api_key_prefix=prefix, api_key_hash=digest, api_key_created_at=now)
-    wallet.api_key_prefix, wallet.api_key_hash, wallet.api_key_created_at = prefix, digest, now
+    AdminWallet.objects.filter(pk=wallet.pk).update(
+        api_key_prefix=prefix, api_key_hash=digest, api_key_encrypted=encrypted, api_key_created_at=now,
+    )
+    wallet.api_key_prefix, wallet.api_key_hash, wallet.api_key_encrypted, wallet.api_key_created_at = prefix, digest, encrypted, now
     return wallet, key
 
 
@@ -343,8 +346,8 @@ def revoke_sandbox_key(*, wallet_id):
     wallet = _locked(wallet_id)
     if not wallet.is_sandbox:
         raise ValidationError("Only a sandbox wallet's key can be revoked here.")
-    AdminWallet.objects.filter(pk=wallet.pk).update(api_key_hash=None, api_key_prefix="", api_key_created_at=None)
-    wallet.api_key_hash, wallet.api_key_prefix, wallet.api_key_created_at = None, "", None
+    AdminWallet.objects.filter(pk=wallet.pk).update(api_key_hash=None, api_key_prefix="", api_key_encrypted="", api_key_created_at=None)
+    wallet.api_key_hash, wallet.api_key_prefix, wallet.api_key_encrypted, wallet.api_key_created_at = None, "", "", None
     return wallet
 
 

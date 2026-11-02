@@ -20,7 +20,9 @@ from dotenv import load_dotenv
 from config.cache import cache_from_env
 from config.database import database_from_env
 from config.dev_network import DEV_ORIGIN_REGEX, lan_addresses
-from config.security import debug_from_env, jwt_signing_key_from_env, refuse_public_hosts_in_debug, secret_key_from_env
+from config.security import (
+    api_key_encryption_key_from_env, debug_from_env, jwt_signing_key_from_env, refuse_public_hosts_in_debug, secret_key_from_env,
+)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -49,6 +51,11 @@ DEBUG = debug_from_env(environ)
 # Required in production; development uses a random key kept in the local .env
 # (written there on first start). See config/security.py.
 SECRET_KEY = secret_key_from_env(environ, debug=DEBUG, env_file=BASE_DIR / ".env")
+
+# Fernet key for the encrypted copy of each admin API key, so its owner (and a
+# superuser) can see the full key again. Required in production; changing it
+# makes stored keys unreadable until they are regenerated. See config/security.py.
+API_KEY_ENCRYPTION_KEY = api_key_encryption_key_from_env(environ, debug=DEBUG, secret_key=SECRET_KEY)
 
 # Salt for account-linking hashes (IP addresses, device IDs). Changing it means
 # signals recorded before and after the change no longer match each other.

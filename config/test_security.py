@@ -9,6 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
 
 from config.security import (
+    api_key_encryption_key_from_env,
     debug_from_env,
     is_local_host,
     jwt_signing_key_from_env,
@@ -101,6 +102,24 @@ class DebugHostGuardTests(SimpleTestCase):
             refuse_public_hosts_in_debug(["localhost", "api.example.com", "*"])
 
 
+FERNET_KEY = "Q3PWEUAIRPdbJDdvVzcO2_MbWMmmdyFvNjM3-5L_3sg="
+
+
+class ApiKeyEncryptionKeyTests(SimpleTestCase):
+    def test_production_requires_a_valid_fernet_key(self):
+        self.assertEqual(api_key_encryption_key_from_env({"API_KEY_ENCRYPTION_KEY": f" {FERNET_KEY} "}, debug=False, secret_key="s"), FERNET_KEY)
+        with self.assertRaisesMessage(ImproperlyConfigured, "Set API_KEY_ENCRYPTION_KEY"):
+            api_key_encryption_key_from_env({}, debug=False, secret_key="s")
+        with self.assertRaisesMessage(ImproperlyConfigured, "not a valid Fernet key"):
+            api_key_encryption_key_from_env({"API_KEY_ENCRYPTION_KEY": "short"}, debug=False, secret_key="s")
+
+    def test_development_derives_a_stable_key_from_the_secret_key(self):
+        first = api_key_encryption_key_from_env({}, debug=True, secret_key="d" * 60)
+        self.assertEqual(first, api_key_encryption_key_from_env({}, debug=True, secret_key="d" * 60))
+        self.assertNotEqual(first, api_key_encryption_key_from_env({}, debug=True, secret_key="e" * 60))
+        self.assertEqual(api_key_encryption_key_from_env({"API_KEY_ENCRYPTION_KEY": FERNET_KEY}, debug=True, secret_key="d"), FERNET_KEY)
+
+
 class SettingsStartupTests(SimpleTestCase):
     """config/settings.py loaded in a fresh process, as at a real start."""
 
@@ -120,7 +139,8 @@ class SettingsStartupTests(SimpleTestCase):
     def production(self, **overrides):
         return self.run_settings(**{
             "DJANGO_DEBUG": "false", "DJANGO_SECRET_KEY": "p" * 60, "DJANGO_JWT_SIGNING_KEY": "j" * 60,
-            "ACCOUNT_SIGNAL_SALT": "s" * 40, "DJANGO_ALLOWED_HOSTS": "api.example.com", **overrides,
+            "ACCOUNT_SIGNAL_SALT": "s" * 40, "DJANGO_ALLOWED_HOSTS": "api.example.com",
+            "API_KEY_ENCRYPTION_KEY": FERNET_KEY, **overrides,
         })
 
     def test_production_settings_load_with_a_separate_jwt_key(self):
@@ -147,6 +167,16 @@ class SettingsStartupTests(SimpleTestCase):
         result = self.production(DJANGO_JWT_SIGNING_KEY="")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Set DJANGO_JWT_SIGNING_KEY", result.stderr)
+
+    def test_production_without_an_api_key_encryption_key_refuses_to_start(self):
+        result = self.production(API_KEY_ENCRYPTION_KEY="")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Set API_KEY_ENCRYPTION_KEY", result.stderr)
+
+    def test_production_with_an_invalid_api_key_encryption_key_refuses_to_start(self):
+        result = self.production(API_KEY_ENCRYPTION_KEY="not-a-fernet-key")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("API_KEY_ENCRYPTION_KEY is not a valid Fernet key", result.stderr)
 
     def test_debug_with_a_public_allowed_host_refuses_to_start(self):
         result = self.run_settings(DJANGO_DEBUG="true", DJANGO_SECRET_KEY="d" * 60, DJANGO_ALLOWED_HOSTS="api.example.com")
